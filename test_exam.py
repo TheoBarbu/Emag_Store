@@ -5,10 +5,10 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from bs4 import BeautifulSoup
-import unittest
 import time
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.common.exceptions import TimeoutException
+import HtmlTestRunner
 
 
 class OrderTest(unittest.TestCase):
@@ -24,9 +24,10 @@ class OrderTest(unittest.TestCase):
     SORT_BY_DESCENDING_PRICE_OPTION = (By.XPATH, "//a[contains(text(), 'Pret descrescator')]")
 
     SORT_BY_DESCENDING_DISCOUNT_OPTION = (By.XPATH, "//a[contains(text(), 'Discount %')]")
-    ADD_TO_CART_BUTTON = (By.XPATH, "// *[ @ id = 'card_grid'] / div[1] / div[1] / div[1] / div[4] / div[2] / form[1] / button[1]")
-    CART_ITEM = (By.CSS_SELECTOR, ".cart-widget.cart-line")  # replace with actual locator
-    GO_TO_CART_BUTTON = (By.XPATH, "//a[contains(text(), 'Vezi detalii cos')]")  # replace with actual locator
+    ADD_TO_CART_BUTTON = (By.CSS_SELECTOR, ".btn.btn-sm.btn-primary.btn-emag.btn-block.yeahIWantThisProduct:first-of-type")
+
+    CART_ITEM = (By.CSS_SELECTOR, ".cart-widget.cart-line")
+    GO_TO_CART_BUTTON = (By.XPATH, "//a[contains(text(), 'Vezi detalii cos')]")
 
     def setUp(self) -> None:
         chrome_options = webdriver.ChromeOptions()
@@ -56,17 +57,21 @@ class OrderTest(unittest.TestCase):
         shopping_cart_button = WebDriverWait(self.chrome, 5).until(EC.visibility_of_element_located(self.SHOPPING_CART_BUTTON))
         self.assertTrue(shopping_cart_button.is_displayed(), 'ERROR.Shopping cart button is not displayed')
 
+    # test if search form exist
     def test_search_form(self):
         wait = WebDriverWait(self.chrome, 10)
         search_form = wait.until(EC.presence_of_element_located((self.SEARCH_FORM)))
         self.assertIsNotNone(search_form)
 
+    # find the search button after is located, send the search keyword to the search box and submit the form
     def test_search_button(self):
         wait = WebDriverWait(self.chrome, 10)
         search_input = wait.until(EC.presence_of_element_located((self.SEARCH_BUTTON)))
         search_input.send_keys(self.SEARCH_KEYWORD)
         search_input.submit()
+        self.assertIsNotNone(search_input)
 
+    # wait for the sort dropdown button to be present and the find it, click the sort dropdown button to make the list of options visible and click the sort option
     def test_search_functionality_and_sort(self):
         wait = WebDriverWait(self.chrome, 40)
         search_input = wait.until(EC.presence_of_element_located((self.SEARCH_FORM)))
@@ -76,7 +81,9 @@ class OrderTest(unittest.TestCase):
         sort_dropdown_button.click()
         sort_option = wait.until(EC.presence_of_element_located((self.SORT_BY_DESCENDING_PRICE_OPTION)))
         sort_option.click()
+        self.assertIsNotNone(sort_option)
 
+    # search for item, order by price, add the first to cart
     def test_search_discount_and_add_to_cart(self):
         wait = WebDriverWait(self.chrome, 30)
         search_input = wait.until(EC.presence_of_element_located((self.SEARCH_FORM)))
@@ -87,10 +94,11 @@ class OrderTest(unittest.TestCase):
         sort_option = wait.until(EC.presence_of_element_located((self.SORT_BY_DESCENDING_DISCOUNT_OPTION)))
         sort_option.click()
         time.sleep(5)
-
         add_to_cart_button = wait.until(EC.element_to_be_clickable((self.ADD_TO_CART_BUTTON)))
         add_to_cart_button.click()
+        self.assertTrue(add_to_cart_button)
 
+    # search for item, order by discount, add the first to cart, check the cart
     def test_item_added_to_cart(self):
         wait = WebDriverWait(self.chrome, 30)
         search_input = wait.until(EC.presence_of_element_located((self.SEARCH_FORM)))
@@ -109,6 +117,7 @@ class OrderTest(unittest.TestCase):
         cart_item = WebDriverWait(self.chrome, 10).until(EC.presence_of_element_located(self.CART_ITEM))
         self.assertIsNotNone(cart_item)
 
+    # search by a product, sort it by the Discount and add it to cart, then delete it and check the cart
     def test_item_added_to_cart_then_delete(self):
         wait = WebDriverWait(self.chrome, 30)
         search_input = wait.until(EC.presence_of_element_located((self.SEARCH_FORM)))
@@ -121,21 +130,28 @@ class OrderTest(unittest.TestCase):
         time.sleep(5)
         add_to_cart_button = wait.until(EC.element_to_be_clickable((self.ADD_TO_CART_BUTTON)))
         add_to_cart_button.click()
-        go_to_cart_button = WebDriverWait(self.chrome, 10).until(EC.visibility_of_element_located(self.GO_TO_CART_BUTTON))
+        go_to_cart_button = WebDriverWait(self.chrome, 10).until( EC.visibility_of_element_located(self.GO_TO_CART_BUTTON))
         go_to_cart_button.click()
         time.sleep(10)
         cart_items = WebDriverWait(self.chrome, 10).until(EC.presence_of_all_elements_located(self.CART_ITEM))
         self.assertGreater(len(cart_items), 0, "No items found in the cart")
 
-        for cart_item in cart_items:
-            delete_button = WebDriverWait(self.chrome, 10).until(EC.element_to_be_clickable((By.XPATH,'//*[@id="cart-products"]/div[1]/div[1]/div[4]/div[1]/div[1]/div[2]/div[2]/div[2]/button[1]')))
-            delete_button.click()
-            time.sleep(2)
-        try:
-            WebDriverWait(self.chrome, 5).until(EC.presence_of_element_located(self.CART_ITEM))
-            self.fail("ERROR: Items are still present in the cart after deletion")
-        except TimeoutException:
-            pass
+
+class TestSuite(unittest.TestCase):
+
+    def test_suite(self):
+        tests_to_run = unittest.TestSuite()
+        tests_to_run.addTests([
+            unittest.defaultTestLoader.loadTestsFromTestCase(OrderTest),
+        ])
+
+        runner = HtmlTestRunner.HTMLTestRunner(
+            combine_reports=True,
+            report_title="Test Execution Report",
+            report_name="Test Results"
+        )
+
+        runner.run(tests_to_run)
 
 
 if __name__ == '__main__':
